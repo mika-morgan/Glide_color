@@ -269,42 +269,59 @@ del _glide_input`);
       });
     });
 
-    // --- Block highlighting ---
-    let lastHighlights = [];
-    function clearHighlights() {
-      lastHighlights.forEach(({line, cls}) => editor.removeLineClass(line, "background", cls));
-      lastHighlights = [];
-    }
-    function highlightBlock(lineNum, keyword) {
+   // --- Block highlighting ---
+let lastHighlights = [];
+
+function clearHighlights() {
+  lastHighlights.forEach(({ line, cls }) =>
+    editor.removeLineClass(line, "background", cls)
+  );
+  lastHighlights = [];
+}
+
+function highlightBlock(lineNum, keyword) {
+  clearHighlights();
+  const total = editor.lineCount();
+  const startIndent = editor.getLine(lineNum).match(/^\s*/)[0].length;
+  let endLine = lineNum + 1;
+  while (endLine < total) {
+    const text = editor.getLine(endLine);
+    if (!text.trim()) { endLine++; continue; }
+    const indent = text.match(/^\s*/)[0].length;
+    if (indent <= startIndent) break;
+    endLine++;
+  }
+
+  let cls = "highlight-cond";
+  if (/^(for|while)/.test(keyword)) cls = "highlight-loop";
+  if (/^def/.test(keyword)) cls = "highlight-func";
+
+  for (let i = lineNum; i < endLine; i++) {
+    editor.addLineClass(i, "background", cls);
+    lastHighlights.push({ line: i, cls });
+  }
+}
+
+editor.getWrapperElement().addEventListener("contextmenu", (e) => {
+  const pos = editor.coordsChar({ left: e.clientX, top: e.clientY });
+  const line = editor.getLine(pos.line);
+  const match = line.trim().match(/^(if|elif|else|for|while|def)\b/);
+
+  if (match) {
+    e.preventDefault();
+
+    // If already highlighted, clear instead
+    if (lastHighlights.some(h => h.line === pos.line)) {
       clearHighlights();
-      const total = editor.lineCount();
-      const startIndent = editor.getLine(lineNum).match(/^\s*/)[0].length;
-      let endLine = lineNum+1;
-      while (endLine < total) {
-        const text = editor.getLine(endLine);
-        if (!text.trim()) { endLine++; continue; }
-        const indent = text.match(/^\s*/)[0].length;
-        if (indent <= startIndent) break;
-        endLine++;
-      }
-      let cls = "highlight-cond";
-      if (/^(for|while)/.test(keyword)) cls = "highlight-loop";
-      if (/^def/.test(keyword)) cls = "highlight-func";
-      for (let i=lineNum; i<endLine; i++) {
-        editor.addLineClass(i, "background", cls);
-        lastHighlights.push({line:i, cls});
-      }
+    } else {
+      highlightBlock(pos.line, match[1]);
     }
-    editor.getWrapperElement().addEventListener("contextmenu", e => {
-      const {left, top} = editor.getWrapperElement().getBoundingClientRect();
-      const pos = editor.coordsChar({left: e.clientX, top: e.clientY});
-      const line = editor.getLine(pos.line);
-      const match = line.trim().match(/^(if|elif|else|for|while|def)\b/);
-      if (match) {
-        e.preventDefault();
-        highlightBlock(pos.line, match[1]);
-      }
-    });
+  } else {
+    // Right-click anywhere else clears
+    clearHighlights();
+  }
+});
+
   </script>
 </body>
 </html>
